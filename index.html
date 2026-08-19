@@ -48,8 +48,16 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 .forgotResult{margin-top:14px;padding:11px 12px;border-radius:11px;background:#f1f6fa;color:var(--nav);font-size:14px;display:none}
 
 
-.golden-card{border-left:5px solid var(--accent)}
-.golden-point{font-size:18px;font-weight:700;line-height:1.45;padding:12px 14px;border-radius:12px;background:#fff7d6}
+.golden-card{border-left:6px solid var(--accent);position:relative;overflow:hidden}
+.golden-card:before{content:"⭐ MUST REMEMBER";position:absolute;right:14px;top:14px;font-size:11px;font-weight:900;color:#7a5b00;background:#fff7d6;padding:5px 8px;border-radius:999px}
+.golden-point{font-size:18px;font-weight:800;line-height:1.5;padding:14px 15px;border-radius:13px;background:#fff7d6;border:1px solid #f2df8b}
+.golden-marathi{font-size:16px;line-height:1.55}
+.golden-ref{font-weight:800;color:var(--nav)}
+.golden-memory{margin-top:10px;padding:11px 13px;border-radius:11px;background:#f7fafc;border:1px dashed #b9c7d2}
+.golden-count{font-size:12px;color:var(--muted)}
+.golden-top{background:linear-gradient(135deg,#fff8d8,#fff);border:1px solid #f1df92}
+.golden-tools{position:sticky;top:0;z-index:2;background:#fff;padding-bottom:4px}
+.golden-empty{text-align:center;padding:25px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
@@ -121,13 +129,18 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 
 
 <section id="golden" class="hidden">
-<div class="card">
-  <h2>⭐ Golden Points</h2>
-  <p class="muted">Exam-oriented key points from the 750-question bank. Read the point, Marathi meaning, and reference before attempting MCQs.</p>
-  <div class="row">
+<div class="card golden-top">
+  <h2>⭐ Golden Points — F-Card Quick Revision</h2>
+  <p>फक्त exam मध्ये लक्षात ठेवायचे <b>key points</b>. प्रत्येक point सोबत English, Marathi meaning, reference आणि त्या reference वरील MCQ practice मिळेल.</p>
+  <div class="row golden-tools">
     <select id="goldenCat"></select>
-    <input id="goldenSearch" placeholder="Search Golden Point / Regulation / Section...">
+    <input id="goldenSearch" placeholder="Search section / regulation / keyword...">
   </div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn warn" type="button" onclick="clearGoldenSearch()">⭐ Show All Golden Points</button>
+    <button class="btn alt" type="button" onclick="show('study')">📚 Go to MCQs</button>
+  </div>
+  <div id="goldenSummary" class="muted" style="margin-top:10px"></div>
 </div>
 <div id="goldenList"></div>
 </section>
@@ -453,39 +466,70 @@ function marathi(e){
  return 'या प्रश्नाचा मुद्दा exam साठी महत्त्वाचा आहे. दिलेला English explanation आणि reference section लक्षात ठेवा.';
 }
 
-function renderGoldenPoints(){
-  const catEl=$('goldenCat'), searchEl=$('goldenSearch'), list=$('goldenList');
-  if(!catEl || !searchEl || !list) return;
-  const cat=catEl.value || 'ALL';
-  const s=(searchEl.value||'').toLowerCase().trim();
-
-  // One Golden Point per unique reference + explanation.
+function goldenPointsData(){
   const seen=new Set(), points=[];
   for(const x of DATA){
     const key=(x.cat||'')+'|'+(x.ref||'')+'|'+(x.e||'');
     if(seen.has(key)) continue;
     seen.add(key);
-    points.push(x);
+    const count=DATA.filter(q=>(q.cat||'')===x.cat && (q.ref||'')===x.ref).length;
+    points.push({...x, mcqCount:count});
   }
+  return points;
+}
 
+function escapeHtml(v){
+  return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderGoldenPoints(){
+  const catEl=$('goldenCat'), searchEl=$('goldenSearch'), list=$('goldenList');
+  if(!catEl || !searchEl || !list) return;
+  const cat=catEl.value || 'ALL';
+  const s=(searchEl.value||'').toLowerCase().trim();
+  const points=goldenPointsData();
   const arr=points.filter(x=>
     (cat==='ALL'||x.cat===cat) &&
     (!s || (x.ref+' '+x.e+' '+x.cat).toLowerCase().includes(s))
   );
+  const summary=$('goldenSummary');
+  if(summary) summary.textContent=`Showing ${arr.length} Golden Points • ${points.length} total unique points from ${DATA.length} MCQs`;
+  list.innerHTML=arr.length ? arr.map((x,n)=>{
+    const ref=escapeHtml(x.ref);
+    const catText=escapeHtml(x.cat);
+    const eng=escapeHtml(x.e);
+    const mar=escapeHtml(marathi(x.e));
+    const memory=escapeHtml((x.ref||'')+' → '+(x.e||''));
+    const refArg=String(x.ref).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const catArg=String(x.cat).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="card golden-card">
+      <div class="muted">${catText} • Golden Point ${n+1}</div>
+      <h3 style="margin:10px 0 6px;padding-right:125px" class="golden-ref">${ref}</h3>
+      <div class="golden-count">This reference appears in ${x.mcqCount} MCQ${x.mcqCount===1?'':'s'} in the current bank.</div>
+      <div class="golden-point" style="margin-top:10px">⭐ ${eng}</div>
+      <div class="explain golden-marathi" style="margin-top:10px">
+        <b>🇮🇳 मराठी अर्थ:</b><br>${mar}
+      </div>
+      <div class="golden-memory"><b>🧠 Memory:</b> ${memory}</div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" onclick="practiceGolden('${refArg}','${catArg}')">📝 Practice MCQs</button>
+        <button class="btn alt" onclick="copyGolden('${eng.replace(/'/g,"\\'")}','${refArg}')">📋 Copy Point</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="card golden-empty"><h3>⭐ No Golden Points found</h3><p class="muted">Topic किंवा search keyword बदला.</p></div>';
+}
 
-  list.innerHTML=arr.length ? arr.map((x,n)=>`
-    <div class="card golden-card">
-      <div class="muted">${x.cat} • Golden Point ${n+1}</div>
-      <h3 style="margin:8px 0">${x.ref}</h3>
-      <div class="golden-point">⭐ ${x.e}</div>
-      <div class="explain" style="margin-top:10px">
-        <b>मराठी अर्थ:</b> ${marathi(x.e)}
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn" onclick="practiceGolden('${String(x.ref).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${String(x.cat).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">MCQ Practice</button>
-      </div>
-    </div>`).join('') :
-    '<div class="card"><b>No Golden Points found.</b><p class="muted">Try another topic or search word.</p></div>';
+function clearGoldenSearch(){
+  if($('goldenCat')) $('goldenCat').value='ALL';
+  if($('goldenSearch')) $('goldenSearch').value='';
+  renderGoldenPoints();
+}
+
+function copyGolden(point,ref){
+  const text='⭐ '+point+'\nReference: '+ref;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>alert('Golden Point copied ✓')).catch(()=>alert(text));
+  } else alert(text);
 }
 
 function practiceGolden(ref,cat){
@@ -500,7 +544,7 @@ function initGoldenPoints(){
   const catEl=$('goldenCat'), searchEl=$('goldenSearch');
   if(!catEl) return;
   const cats=[...new Set(DATA.map(x=>x.cat))];
-  catEl.innerHTML='<option value="ALL">All Topics</option>'+cats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
+  catEl.innerHTML='<option value="ALL">⭐ All Topics</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   catEl.onchange=renderGoldenPoints;
   if(searchEl) searchEl.oninput=renderGoldenPoints;
   renderGoldenPoints();
