@@ -34,6 +34,19 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 .loginBox .loginMsg{min-height:20px;margin-top:10px;font-size:13px}
 .loginBox .demo{margin-top:16px;padding:12px;background:#f1f6fa;border-radius:10px;font-size:13px}
 #appShell{display:none}
+
+/* In-app Forgot Password modal (no browser prompt) */
+#forgotModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:9999;align-items:center;justify-content:center;padding:18px}
+#forgotModal.show{display:flex}
+.forgotCard{width:min(100%,430px);background:#fff;border-radius:22px;padding:24px;box-shadow:0 18px 60px rgba(0,0,0,.28)}
+.forgotCard h3{margin:0 0 7px;font-size:24px}
+.forgotCard p{margin:0 0 18px;color:var(--muted)}
+.forgotCard label{display:block;font-weight:700;margin:12px 0 7px}
+.forgotCard input{width:100%;padding:13px 14px;border:1px solid #ccd5dd;border-radius:12px;font-size:16px}
+.forgotActions{display:flex;gap:10px;margin-top:16px}
+.forgotActions button{flex:1}
+.forgotResult{margin-top:14px;padding:11px 12px;border-radius:11px;background:#f1f6fa;color:var(--nav);font-size:14px;display:none}
+
 </style>
 </head>
 <body>
@@ -52,6 +65,21 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
     <button class="btn" style="width:100%;margin-top:16px" onclick="login()">Login</button>
     <button type="button" class="btn alt" style="width:100%;margin-top:10px" onclick="forgotPassword()">Forgot Password?</button>
     <div id="loginMsg" class="loginMsg"></div>
+  </div>
+</div>
+
+
+<div id="forgotModal" aria-hidden="true">
+  <div class="forgotCard" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
+    <h3 id="forgotTitle">🔐 Forgot Password</h3>
+    <p>Enter your User ID. Password reset is completed by the Admin.</p>
+    <label for="forgotUserId">User ID</label>
+    <input id="forgotUserId" autocomplete="username" placeholder="Enter User ID">
+    <div class="forgotActions">
+      <button type="button" class="btn alt" onclick="closeForgotModal()">Cancel</button>
+      <button type="button" class="btn" onclick="requestPasswordReset()">Request Reset</button>
+    </div>
+    <div id="forgotResult" class="forgotResult"></div>
   </div>
 </div>
 
@@ -243,17 +271,42 @@ function createUser(){
   renderUsers();
 }
 function forgotPassword(){
-  const id=prompt('Enter your User ID:');
-  if(!id)return;
-  const user=getUsers().find(u=>u.id.toLowerCase()===id.trim().toLowerCase());
-  const msg=$('loginMsg');
-  if(!user){
-    msg.textContent='❌ User ID not found.';
-    msg.style.color='var(--bad)';
+  const modal=$('forgotModal');
+  const input=$('forgotUserId');
+  const result=$('forgotResult');
+  if(!modal)return;
+  result.style.display='none';
+  result.textContent='';
+  input.value='';
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden','false');
+  setTimeout(()=>input.focus(),80);
+}
+function closeForgotModal(){
+  const modal=$('forgotModal');
+  if(!modal)return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden','true');
+}
+function requestPasswordReset(){
+  const id=($('forgotUserId').value||'').trim();
+  const result=$('forgotResult');
+  if(!id){
+    result.textContent='⚠️ Please enter your User ID.';
+    result.style.display='block';
+    result.style.color='var(--bad)';
     return;
   }
-  msg.textContent='🔐 Password reset is handled by the Admin. Ask the Admin to use “Reset Password” for your User ID.';
-  msg.style.color='var(--nav)';
+  const user=getUsers().find(u=>u.id.toLowerCase()===id.toLowerCase());
+  if(!user){
+    result.textContent='❌ User ID not found.';
+    result.style.display='block';
+    result.style.color='var(--bad)';
+    return;
+  }
+  result.textContent='🔐 Reset request recorded. Ask the Admin to use “Reset Password” for this User ID.';
+  result.style.display='block';
+  result.style.color='var(--nav)';
 }
 function adminResetPassword(id){
   const admin=getCurrentUser();
@@ -420,6 +473,15 @@ function clearWrong(){state.wrong=[];save();renderWrong()}
 init();
 ensureLogin();
 if(getCurrentUser()) updateRoleUI();
+
+document.addEventListener('click',function(e){
+  const m=$('forgotModal');
+  if(m && e.target===m) closeForgotModal();
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape') closeForgotModal();
+});
+
 </script>
 </body>
 </html>
