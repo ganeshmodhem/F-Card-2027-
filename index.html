@@ -47,6 +47,9 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 .forgotActions button{flex:1}
 .forgotResult{margin-top:14px;padding:11px 12px;border-radius:11px;background:#f1f6fa;color:var(--nav);font-size:14px;display:none}
 
+
+.golden-card{border-left:5px solid var(--accent)}
+.golden-point{font-size:18px;font-weight:700;line-height:1.45;padding:12px 14px;border-radius:12px;background:#fff7d6}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
@@ -89,7 +92,7 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 <div id="appShell">
 <header><div class="row" style="align-items:center"><div style="flex:1"><h1>F-Card Customs Exam Master – 2027 • 750 MCQ Master</h1></div><button class="btn alt" style="flex:0 0 auto;padding:8px 12px" onclick="logout()">Logout</button></div><div class="sub">CBLR 2018 • Customs Act • Baggage • Allied Acts • 750 MCQ Master</div></header>
 <nav id="tabs">
-<button class="active" data-tab="home">Home</button><button data-tab="study">Study</button><button data-tab="mock">Mock Test</button><button data-tab="wrong">Wrong Qs</button><button data-tab="progress">Progress</button><button id="adminTab" class="hidden" data-tab="admin">Admin</button>
+<button class="active" data-tab="home">Home</button><button data-tab="study">Study</button><button data-tab="golden">⭐ Golden Points</button><button data-tab="mock">Mock Test</button><button data-tab="wrong">Wrong Qs</button><button data-tab="progress">Progress</button><button id="adminTab" class="hidden" data-tab="admin">Admin</button>
 </nav>
 <main>
 <section id="home">
@@ -114,6 +117,19 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 <section id="study" class="hidden">
 <div class="card"><h2>Study MCQs</h2><div class="row"><select id="catFilter"></select><input id="search" placeholder="Search question / section..."></div></div>
 <div id="studyList"></div>
+</section>
+
+
+<section id="golden" class="hidden">
+<div class="card">
+  <h2>⭐ Golden Points</h2>
+  <p class="muted">Exam-oriented key points from the 750-question bank. Read the point, Marathi meaning, and reference before attempting MCQs.</p>
+  <div class="row">
+    <select id="goldenCat"></select>
+    <input id="goldenSearch" placeholder="Search Golden Point / Regulation / Section...">
+  </div>
+</div>
+<div id="goldenList"></div>
 </section>
 
 <section id="mock" class="hidden">
@@ -406,7 +422,7 @@ function renderHistory(){
   const h=state.history||[];
   box.innerHTML=h.length?h.slice().reverse().slice(0,10).map(x=>`<div class="pill" style="margin:4px 0;display:block">${x.date} • ${x.size}Q • ${x.marks}/${x.max} • ${x.pct}% • C:${x.correct} W:${x.incorrect} S:${x.skipped}</div>`).join(''):'<span class="muted">No test history yet.</span>';
 }
-function show(id){document.querySelectorAll('main>section').forEach(s=>s.classList.add('hidden'));$(id).classList.remove('hidden');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id)); if(id==='study')renderStudy(); if(id==='wrong')renderWrong(); if(id==='progress')refreshStats();}
+function show(id){document.querySelectorAll('main>section').forEach(s=>s.classList.add('hidden'));$(id).classList.remove('hidden');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id)); if(id==='study')renderStudy(); if(id==='golden')renderGoldenPoints(); if(id==='wrong')renderWrong(); if(id==='progress')refreshStats();}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
 function init(){
  refreshStats();
@@ -436,6 +452,60 @@ function marathi(e){
  for(const [r,m] of map) if(r.test(e)) return m;
  return 'या प्रश्नाचा मुद्दा exam साठी महत्त्वाचा आहे. दिलेला English explanation आणि reference section लक्षात ठेवा.';
 }
+
+function renderGoldenPoints(){
+  const catEl=$('goldenCat'), searchEl=$('goldenSearch'), list=$('goldenList');
+  if(!catEl || !searchEl || !list) return;
+  const cat=catEl.value || 'ALL';
+  const s=(searchEl.value||'').toLowerCase().trim();
+
+  // One Golden Point per unique reference + explanation.
+  const seen=new Set(), points=[];
+  for(const x of DATA){
+    const key=(x.cat||'')+'|'+(x.ref||'')+'|'+(x.e||'');
+    if(seen.has(key)) continue;
+    seen.add(key);
+    points.push(x);
+  }
+
+  const arr=points.filter(x=>
+    (cat==='ALL'||x.cat===cat) &&
+    (!s || (x.ref+' '+x.e+' '+x.cat).toLowerCase().includes(s))
+  );
+
+  list.innerHTML=arr.length ? arr.map((x,n)=>`
+    <div class="card golden-card">
+      <div class="muted">${x.cat} • Golden Point ${n+1}</div>
+      <h3 style="margin:8px 0">${x.ref}</h3>
+      <div class="golden-point">⭐ ${x.e}</div>
+      <div class="explain" style="margin-top:10px">
+        <b>मराठी अर्थ:</b> ${marathi(x.e)}
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" onclick="practiceGolden('${String(x.ref).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${String(x.cat).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">MCQ Practice</button>
+      </div>
+    </div>`).join('') :
+    '<div class="card"><b>No Golden Points found.</b><p class="muted">Try another topic or search word.</p></div>';
+}
+
+function practiceGolden(ref,cat){
+  show('study');
+  const filter=$('catFilter'), search=$('search');
+  if(filter) filter.value=cat;
+  if(search) search.value=ref;
+  renderStudy();
+}
+
+function initGoldenPoints(){
+  const catEl=$('goldenCat'), searchEl=$('goldenSearch');
+  if(!catEl) return;
+  const cats=[...new Set(DATA.map(x=>x.cat))];
+  catEl.innerHTML='<option value="ALL">All Topics</option>'+cats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
+  catEl.onchange=renderGoldenPoints;
+  if(searchEl) searchEl.oninput=renderGoldenPoints;
+  renderGoldenPoints();
+}
+
 function startMock(n){
  current=[...DATA].sort(()=>Math.random()-.5).slice(0,n);
  idx=0; correct=0; incorrect=0; skipped=0; answered=false; mockSize=n;
@@ -529,6 +599,7 @@ try { init(); } catch(e) { console.error("Init error", e); }
 ensureLogin();
 if(getCurrentUser()) updateRoleUI();
 bootStudy();
+initGoldenPoints();
 
 document.addEventListener('click',function(e){
   const m=$('forgotModal');
