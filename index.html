@@ -50,6 +50,7 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
     <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter Password">
 
     <button class="btn" style="width:100%;margin-top:16px" onclick="login()">Login</button>
+    <button type="button" class="btn alt" style="width:100%;margin-top:10px" onclick="forgotPassword()">Forgot Password?</button>
     <div id="loginMsg" class="loginMsg"></div>
   </div>
 </div>
@@ -241,6 +242,32 @@ function createUser(){
   $('newUserId').value='';$('newUserPw').value='';
   renderUsers();
 }
+function forgotPassword(){
+  const id=prompt('Enter your User ID:');
+  if(!id)return;
+  const user=getUsers().find(u=>u.id.toLowerCase()===id.trim().toLowerCase());
+  const msg=$('loginMsg');
+  if(!user){
+    msg.textContent='❌ User ID not found.';
+    msg.style.color='var(--bad)';
+    return;
+  }
+  msg.textContent='🔐 Password reset is handled by the Admin. Ask the Admin to use “Reset Password” for your User ID.';
+  msg.style.color='var(--nav)';
+}
+function adminResetPassword(id){
+  const admin=getCurrentUser();
+  if(!admin || admin.role!=='admin'){alert('Admin access required.');return;}
+  const np=prompt('Enter a new password for '+id+' (minimum 6 characters):');
+  if(np===null)return;
+  if(np.length<6){alert('Password must be at least 6 characters.');return;}
+  const users=getUsers();
+  const i=users.findIndex(u=>u.id===id);
+  if(i<0){alert('User not found.');return;}
+  users[i].password=np;
+  localStorage.setItem(USERS_KEY,JSON.stringify(users));
+  alert('Password reset successfully for '+id+'.');
+}
 function resetUser(id){
   if(!confirm('Reset progress for '+id+'?'))return;
   localStorage.removeItem(STATE_PREFIX+encodeURIComponent(id).toLowerCase());
@@ -265,6 +292,7 @@ function renderUsers(){
       <b>${u.name||u.id}</b> <span class="pill">${u.role}</span>
       <div class="muted">${u.id} • Attempts ${st.attempts} • Best ${st.best}% • Answered ${st.answered} • Wrong ${st.wrong.length}</div>
       ${u.id!=='ADMIN'?`<button class="btn alt" style="margin-top:8px" onclick="resetUser('${u.id.replace(/'/g,"\\'")}')">Reset Progress</button>
+      <button class="btn alt" style="margin-top:8px" onclick="adminResetPassword('${u.id.replace(/'/g,"\\'")}')">Reset Password</button>
       <button class="btn alt" style="margin-top:8px" onclick="deleteUser('${u.id.replace(/'/g,"\\'")}')">Delete</button>`:''}
     </div>`;
   }).join('');
