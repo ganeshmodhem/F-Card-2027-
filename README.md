@@ -1,14 +1,15 @@
-# F-Card Customs Exam Master – 2027 V3
+# F-Card Customs Exam Master – 2027 • 750 MCQ Master
 
-500 original practice MCQs with 20/50/100/150-question tests.
+750 original practice MCQs covering:
+- CBLR 2018
+- Customs Act, 1962
+- Baggage
+- Allied Acts
+- Customs documentation, assessment, valuation, warehousing, drawback, penalties, appeals, ICEGATE/ICES
+- Scenario and high-yield revision questions
 
-150-Q Full Exam simulator:
-- 150 minutes
-- +3 correct
-- -1 incorrect
-- 450 maximum
-- 270 (60%) target
+Each question includes four options, correct answer, Marathi explanation and section/regulation reference.
 
-The full-exam simulator follows the latest published NACIN Customs Brokers Licensing Examination pattern available when this version was prepared. It is not a claim about the final 2027 notification; update the pattern when NACIN publishes the 2027 notice.
+The app is a study aid, not an official NACIN/CBIC publication. Verify current law, notifications and the 2027 exam notification when published.
 
-Practice content is original and not reproduced from commercial solved-paper books.
+Current published NACIN 2026 written-exam pattern used for the full-exam simulator: 150 MCQs, 2.5 hours, +3/-1, maximum 450, qualifying 270 (60%).

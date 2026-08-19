@@ -1,9 +1,9 @@
 {
-  "name": "F-Card Customs Exam Master – 2027",
-  "short_name": "F-Card Exam 2027",
-  "start_url": "./",
+  "name": "F-Card Customs Exam Master",
+  "short_name": "F-Card Exam",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f7fb",
   "theme_color": "#0f3d5e",
-  "description": "F-Card Customs exam preparation with English MCQs and Marathi explanations."
+  "icons": []
 }
