@@ -67,6 +67,7 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 
     <button class="btn" style="width:100%;margin-top:16px" onclick="login()">Login</button>
     <button type="button" class="btn alt" style="width:100%;margin-top:10px" onclick="forgotPassword()">Forgot Password?</button>
+    <button type="button" class="btn alt" style="width:100%;margin-top:10px" onclick="registerFirebaseUser()">Create Firebase Account</button>
     <div id="loginMsg" class="loginMsg"></div>
   </div>
 </div>
@@ -160,7 +161,7 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 <div class="card"><h3>👥 Users & Progress</h3><div id="userList"></div></div>
 </section>
 </main>
-<footer>F-Card Customs Exam Master • 750 original practice MCQs • 150-Q full-exam simulator • Built for 2027 preparation</footer>
+<footer>F-Card Customs Exam Master • 750 original practice MCQs • 150-Q full-exam simulator • Built for 2027 preparation • Firebase Auth + cloud progress enabled</footer>
 </div>
 <script>
 // Firebase configuration supplied by the app owner.
@@ -204,11 +205,13 @@ function getSession(){
 }
 function getCurrentUser(){
   const s=getSession();
-  return s ? getUsers().find(u=>u.id===s.id) : null;
+  if(!s)return null;
+  if(s.firebase) return {id:s.id,name:s.name||s.id,role:s.role||'student',firebase:true,uid:s.uid};
+  return getUsers().find(u=>u.id===s.id) || null;
 }
 function stateKey(){
   const u=getCurrentUser();
-  return STATE_PREFIX + encodeURIComponent(u?u.id:'guest').toLowerCase();
+  return STATE_PREFIX + encodeURIComponent(u?(u.uid||u.id):'guest').toLowerCase();
 }
 function defaultState(){
   return {wrong:[],attempts:0,best:0,answered:0,history:[]};
@@ -218,6 +221,20 @@ function loadState(){
     const x=JSON.parse(localStorage.getItem(stateKey())||'null');
     return x&&typeof x==='object'?Object.assign(defaultState(),x):defaultState();
   }catch(e){return defaultState()}
+}
+async function loadCloudState(){
+  const u=getCurrentUser();
+  if(!firebaseReady||!db||!u||!u.firebase||!u.uid)return;
+  try{
+    const snap=await db.collection('progress').doc(u.uid).get();
+    if(snap.exists){ state=Object.assign(defaultState(),snap.data()); localStorage.setItem(stateKey(),JSON.stringify(state)); refreshStats(); }
+  }catch(e){ console.warn('Cloud progress load failed:',e); }
+}
+async function saveCloudState(){
+  const u=getCurrentUser();
+  if(!firebaseReady||!db||!u||!u.firebase||!u.uid)return;
+  try{ await db.collection('progress').doc(u.uid).set({...state,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}); }
+  catch(e){ console.warn('Cloud progress save failed:',e); }
 }
 async function login(){
   const id=($('loginId').value||'').trim();
@@ -230,8 +247,10 @@ async function login(){
     try{
       const cred=await firebase.auth().signInWithEmailAndPassword(id,pw);
       const u=cred.user;
-      localStorage.setItem(LOGIN_KEY,JSON.stringify({id:u.email||u.uid,name:u.displayName||u.email||'F-Card Student',role:'student',uid:u.uid,firebase:true,at:Date.now()}));
-      state=loadState(); openApp(); refreshStats(); updateRoleUI();
+      let role='student', name=u.displayName||u.email||'F-Card Student';
+      try{ const us=await db.collection('users').doc(u.uid).get(); if(us.exists){ const d=us.data(); role=d.role||role; name=d.name||name; } }catch(e){}
+      localStorage.setItem(LOGIN_KEY,JSON.stringify({id:u.email||u.uid,name,role,uid:u.uid,firebase:true,at:Date.now()}));
+      state=loadState(); openApp(); refreshStats(); updateRoleUI(); await loadCloudState();
       return;
     }catch(e){
       msg.textContent='❌ Firebase login failed: '+(e.code==='auth/invalid-credential'?'Invalid email or password.':(e.message||'Please check your Firebase setup.'));
@@ -258,7 +277,7 @@ function ensureLogin(){
   getUsers();
   try{
     const s=getSession();
-    if(s&&s.id){state=loadState();openApp();updateRoleUI();refreshStats();}
+    if(s&&s.id){state=loadState();openApp();updateRoleUI();refreshStats();loadCloudState();}
   }catch(e){}
 }
 function updateRoleUI(){
@@ -302,11 +321,28 @@ function createUser(){
   if(users.some(u=>u.id.toLowerCase()===id.toLowerCase())){msg.textContent='❌ User ID already exists.';msg.style.color='var(--bad)';return;}
   users.push({id,password:pw,role:'student',name:id});
   localStorage.setItem(USERS_KEY,JSON.stringify(users));
-  msg.textContent='✅ Student created: '+id;
+  msg.textContent='✅ Local student created: '+id+' (Firebase email accounts should use Create Firebase Account).';
   msg.style.color='var(--ok)';
   $('newUserId').value='';$('newUserPw').value='';
   renderUsers();
 }
+async function registerFirebaseUser(){
+  if(!firebaseReady){alert('Firebase is not initialized.');return;}
+  const email=(prompt('Enter your email address:')||'').trim();
+  if(!email||!email.includes('@')){alert('Please enter a valid email address.');return;}
+  const pw=prompt('Create password (minimum 6 characters):')||'';
+  if(pw.length<6){alert('Password must be at least 6 characters.');return;}
+  try{
+    const cred=await firebase.auth().createUserWithEmailAndPassword(email,pw);
+    const name=prompt('Enter your name:')||email.split('@')[0];
+    await cred.user.updateProfile({displayName:name});
+    await db.collection('users').doc(cred.user.uid).set({email,name,role:'student',createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    localStorage.setItem(LOGIN_KEY,JSON.stringify({id:email,name,role:'student',uid:cred.user.uid,firebase:true,at:Date.now()}));
+    state=defaultState(); openApp(); refreshStats(); updateRoleUI();
+    alert('Account created successfully.');
+  }catch(e){ alert('❌ '+(e.message||'Unable to create account.')); }
+}
+
 function forgotPassword(){
   const modal=$('forgotModal');
   const input=$('forgotUserId');
@@ -393,6 +429,7 @@ const $=id=>document.getElementById(id);
 function save(){
   localStorage.setItem(stateKey(),JSON.stringify(state));
   refreshStats();
+  saveCloudState();
   if(getCurrentUser()?.role==='admin') renderUsers();
 }
 function refreshStats(){
