@@ -58,6 +58,13 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 .golden-top{background:linear-gradient(135deg,#fff8d8,#fff);border:1px solid #f1df92}
 .golden-tools{position:sticky;top:0;z-index:2;background:#fff;padding-bottom:4px}
 .golden-empty{text-align:center;padding:25px}
+.golden-tip{margin-top:10px;padding:11px 13px;border-radius:11px;background:#fffdf0;border:1px solid #f1df92}
+.golden-refbox{margin-top:10px;padding:10px 13px;border-radius:10px;background:#f7fafc;border:1px solid #d9e2e9}
+.golden-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.golden-actions .btn{width:100%}
+.golden-index{font-size:12px;font-weight:800;color:#7a5b00}
+.golden-search-note{margin-top:8px;font-size:12px;color:var(--muted)}
+@media(max-width:520px){.golden-actions{grid-template-columns:1fr}.golden-card h3{padding-right:105px!important}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
@@ -131,7 +138,7 @@ footer{padding:25px 14px;text-align:center;color:var(--muted);font-size:12px}
 <section id="golden" class="hidden">
 <div class="card golden-top">
   <h2>⭐ Golden Points — F-Card Quick Revision</h2>
-  <p>फक्त exam मध्ये लक्षात ठेवायचे <b>key points</b>. प्रत्येक point सोबत English, Marathi meaning, reference आणि त्या reference वरील MCQ practice मिळेल.</p>
+  <p>फक्त exam मध्ये लक्षात ठेवायचे <b>Golden Key Points</b>. प्रत्येक point सोबत <b>English + Marathi meaning + Memory Trick + Exam Tip + Reference + Related MCQs</b> मिळतील.</p>
   <div class="row golden-tools">
     <select id="goldenCat"></select>
     <input id="goldenSearch" placeholder="Search section / regulation / keyword...">
@@ -482,6 +489,15 @@ function escapeHtml(v){
   return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function goldenExamTip(ref, e){
+  const r=String(ref||'').trim();
+  const t=String(e||'').trim();
+  if(/^Regulation\s+/i.test(r)) return `Exam Tip: Remember the Regulation number together with its main duty — ${t}`;
+  if(/^Section\s+/i.test(r)) return `Exam Tip: Remember the Customs Act Section number and the exact subject — ${t}`;
+  if(/Act,|Act$/i.test(r)) return `Exam Tip: Remember the Act name and the Customs relevance — ${t}`;
+  return `Exam Tip: Remember the reference and its key point — ${t}`;
+}
+
 function renderGoldenPoints(){
   const catEl=$('goldenCat'), searchEl=$('goldenSearch'), list=$('goldenList');
   if(!catEl || !searchEl || !list) return;
@@ -490,35 +506,54 @@ function renderGoldenPoints(){
   const points=goldenPointsData();
   const arr=points.filter(x=>
     (cat==='ALL'||x.cat===cat) &&
-    (!s || (x.ref+' '+x.e+' '+x.cat).toLowerCase().includes(s))
+    (!s || (x.ref+' '+x.e+' '+x.cat+' '+marathi(x.e)).toLowerCase().includes(s))
   );
   const summary=$('goldenSummary');
-  if(summary) summary.textContent=`Showing ${arr.length} Golden Points • ${points.length} total unique points from ${DATA.length} MCQs`;
+  if(summary) summary.innerHTML=`<b>Showing ${arr.length}</b> Golden Points • ${points.length} total unique points from ${DATA.length} MCQs<br><span class="golden-search-note">प्रत्येक point मध्ये English + Marathi meaning + Memory + Exam Tip + Reference + related MCQ practice आहे.</span>`;
+
   list.innerHTML=arr.length ? arr.map((x,n)=>{
     const ref=escapeHtml(x.ref);
     const catText=escapeHtml(x.cat);
     const eng=escapeHtml(x.e);
     const mar=escapeHtml(marathi(x.e));
     const memory=escapeHtml((x.ref||'')+' → '+(x.e||''));
+    const tip=escapeHtml(goldenExamTip(x.ref,x.e));
     const refArg=String(x.ref).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const catArg=String(x.cat).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const pointArg=String(x.e).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ');
     return `<div class="card golden-card">
-      <div class="muted">${catText} • Golden Point ${n+1}</div>
-      <h3 style="margin:10px 0 6px;padding-right:125px" class="golden-ref">${ref}</h3>
-      <div class="golden-count">This reference appears in ${x.mcqCount} MCQ${x.mcqCount===1?'':'s'} in the current bank.</div>
-      <div class="golden-point" style="margin-top:10px">⭐ ${eng}</div>
+      <div class="golden-index">${catText} • Golden Point ${n+1}</div>
+      <h3 style="margin:10px 0 6px;padding-right:135px" class="golden-ref">${ref}</h3>
+      <div class="golden-count">📚 This reference appears in ${x.mcqCount} related MCQ${x.mcqCount===1?'':'s'} in the current bank.</div>
+
+      <div class="golden-point" style="margin-top:10px">
+        ⭐ <b>GOLDEN POINT</b><br>${eng}
+      </div>
+
       <div class="explain golden-marathi" style="margin-top:10px">
         <b>🇮🇳 मराठी अर्थ:</b><br>${mar}
       </div>
-      <div class="golden-memory"><b>🧠 Memory:</b> ${memory}</div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn" onclick="practiceGolden('${refArg}','${catArg}')">📝 Practice MCQs</button>
-        <button class="btn alt" onclick="copyGolden('${eng.replace(/'/g,"\\'")}','${refArg}')">📋 Copy Point</button>
+
+      <div class="golden-memory">
+        <b>🧠 Memory:</b> ${memory}
+      </div>
+
+      <div class="golden-tip">
+        <b>🎯 Exam Tip:</b> ${tip}
+      </div>
+
+      <div class="golden-refbox">
+        <b>📖 Reference:</b> ${ref}<br>
+        <span class="muted">Topic: ${catText} • Related MCQs: ${x.mcqCount}</span>
+      </div>
+
+      <div class="golden-actions">
+        <button class="btn" onclick="practiceGolden('${refArg}','${catArg}')">📝 Practice Related MCQs</button>
+        <button class="btn alt" onclick="copyGolden('${pointArg}','${refArg}')">📋 Copy Golden Point</button>
       </div>
     </div>`;
   }).join('') : '<div class="card golden-empty"><h3>⭐ No Golden Points found</h3><p class="muted">Topic किंवा search keyword बदला.</p></div>';
 }
-
 function clearGoldenSearch(){
   if($('goldenCat')) $('goldenCat').value='ALL';
   if($('goldenSearch')) $('goldenSearch').value='';
